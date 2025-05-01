@@ -16,8 +16,8 @@ PHONE = os.getenv("+380661719550")
 
 # Проверка наличия всех переменных
 if not all([TOKEN, API_ID, API_HASH, PHONE]):
-    missing = [var for var, val in [("TOKEN", TOKEN), ("API_ID", API_ID), ("API_HASH", API_HASH), ("PHONE", PHONE)] if not val]
-    raise ValueError(f"Missing environment variables: {', '.join(missing)}")
+    missing = [var for var, val in [("TELEGRAM_BOT_TOKEN", TOKEN), ("TELEGRAM_API_ID", API_ID), ("TELEGRAM_API_HASH", API_HASH), ("TELEGRAM_PHONE", PHONE)] if not val]
+    raise ValueError(f"Отсутствуют переменные окружения: {', '.join(missing)}")
 
 # Настройка логирования
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -30,7 +30,7 @@ def start(update: Update, context):
     else:
         update.message.reply_text("Эта команда работает только в личных сообщениях!")
 
-# Функция для обработки команды или текста "калл"
+# Функция для обработки текста "калл"
 def handle_call(update: Update, context):
     logger.info(f"Получено сообщение в чате {update.message.chat_id}")
     if update.message.chat.type not in ['group', 'supergroup']:
