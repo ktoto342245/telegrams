@@ -82,7 +82,7 @@ def message_handler(update: Update, context: CallbackContext):
 # Команда /mut — мут по reply
 def mute_handler(update: Update, context: CallbackContext):
     if not update.message.reply_to_message:
-        update.message.reply_text("⚠️ Чтобы замутить, отвечатьте на сообщения пользователя. (выда мутов 's = сек;m = мин;h = часы;d = дни;M = месяц;y = год') "
+        update.message.reply_text("⚠️ Чтобы замутить, отвечатьте на сообщения пользователя. (выда мутов 's = сек;m = мин;h = часы;d = дни;M = месяц;y = год') ")
         return
 
     try:
