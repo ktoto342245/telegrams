@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Токен вашего бота из переменной окружения
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN") or "7752116262:AAHW5JE9WCMftH8oH4rTUGmVaS35Dta72lM"
+TOKEN = os.getenv("7752116262:AAHW5JE9WCMftH8oH4rTUGmVaS35Dta72lM") or "7752116262:AAHW5JE9WCMftH8oH4rTUGmVaS35Dta72lM"
 
 # Настройка логирования
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
