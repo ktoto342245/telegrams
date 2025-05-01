@@ -3,7 +3,7 @@ from telegram.ext import Updater, MessageHandler, Filters, CallbackContext, Comm
 import datetime
 import re
 
-TOKEN = "YOUR_TOKEN"  # 🔁 Заміні на свій токен
+TOKEN = "7752116262:AAHW5JE9WCMftH8oH4rTUGmVaS35Dta72lM"  # 🔁 Заміні на свій токен
 
 USER_LIST = """
 @kall_help_bot @Helpmepls53 @zeyka09 @k0ly3 Zxc_top @naznaynepridumal @azaliya_103 
