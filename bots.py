@@ -43,17 +43,17 @@ def parse_duration(duration_str):
     
     for value, unit in matches:
         value = int(value)
-        if unit == 'сек':  # Секунди
+        if unit == 's':  # Секунди
             total_seconds += value
-        elif unit == 'мин':  # Хвилини
+        elif unit == 'm':  # Хвилини
             total_seconds += value * 60
-        elif unit == 'час':  # Години
+        elif unit == 'h':  # Години
             total_seconds += value * 3600
-        elif unit == 'дни':  # Дні
+        elif unit == 'd':  # Дні
             total_seconds += value * 86400
-        elif unit == 'месяц':  # Місяці
+        elif unit == 'M':  # Місяці
             total_seconds += value * 2592000  # 30 днів на місяць
-        elif unit == 'Год':  # Роки
+        elif unit == 'y':  # Роки
             total_seconds += value * 31536000  # 365 днів на рік
     
     return total_seconds
