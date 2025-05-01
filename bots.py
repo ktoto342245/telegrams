@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 import time
 
 # Токен бота
-TOKEN = "ВАШ_ТОКЕН_ТУТ"  # 🔴 Замініть на свій токен
+TOKEN = "7752116262:AAHW5JE9WCMftH8oH4rTUGmVaS35Dta72lM"  # 🔴 Замініть на свій токен
 
 # Список для виклику
 USER_LIST = """
