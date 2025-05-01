@@ -2,22 +2,16 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 from telegram import Update
 from telethon.sync import TelegramClient
 import logging
-import os
-from dotenv import load_dotenv
 
-# Загружаем переменные окружения
-load_dotenv()
-
-# Переменные окружения
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-API_ID = os.getenv("TELEGRAM_API_ID")
-API_HASH = os.getenv("TELEGRAM_API_HASH")
-PHONE = os.getenv("TELEGRAM_PHONE")
+# Впишите свои значения ниже
+TOKEN = "7752116262:AAHW5JE9WCMftH8oH4rTUGmVaS35Dta72lM"  # Токен бота от @BotFather
+API_ID = 13520503  # Ваш API ID от my.telegram.org
+API_HASH = "f7db29069679dcccf7244bc67ac0730d"  # Ваш API Hash от my.telegram.org
+PHONE = "+380661719550"  # Ваш номер телефона, например, +1234567890
 
 # Проверка наличия всех переменных
 if not all([TOKEN, API_ID, API_HASH, PHONE]):
-    missing = [var for var, val in [("TELEGRAM_BOT_TOKEN", TOKEN), ("TELEGRAM_API_ID", API_ID), ("TELEGRAM_API_HASH", API_HASH), ("TELEGRAM_PHONE", PHONE)] if not val]
-    raise ValueError(f"Отсутствуют переменные окружения: {', '.join(missing)}")
+    raise ValueError("Все переменные (TOKEN, API_ID, API_HASH, PHONE) должны быть заполнены!")
 
 # Настройка логирования
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -39,7 +33,7 @@ def handle_call(update: Update, context):
 
     try:
         # Инициализация Telethon клиента
-        client = TelegramClient('session', int(API_ID), API_HASH)
+        client = TelegramClient('session', API_ID, API_HASH)
         with client:
             # Получаем всех участников группы
             members = []
