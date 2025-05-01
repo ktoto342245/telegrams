@@ -88,16 +88,7 @@ def start_handler(update: Update, context: CallbackContext):
     keyboard = admin_commands if is_admin else participant_commands
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-    message = "📋 Доступные команды:\n"
-    message += "Для всех:\n"
-    message += "🔹 калл — Вызвать участников из списка\n"
-    message += "🔹 /mutlist — Показать список замученных пользователей\n"
-    if is_admin:
-        message += "\nДля админов:\n"
-        message += "🔹 /mut <время> <причина> — Замутить пользователя (отвечая на его сообщение)\n"
-        message += "🔹 /unmut — Размутить пользователя (отвечая на его сообщение)\n"
-
-    update.message.reply_text(message, reply_markup=reply_markup)
+    update.message.reply_text(" ", reply_markup=reply_markup)
 
 def message_handler(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
