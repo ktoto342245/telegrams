@@ -14,6 +14,11 @@ API_ID = os.getenv("13520503")
 API_HASH = os.getenv("f7db29069679dcccf7244bc67ac0730d")
 PHONE = os.getenv("+380 66 171 95 50")
 
+# Проверка наличия всех переменных
+if not all([TOKEN, API_ID, API_HASH, PHONE]):
+    missing = [var for var, val in [("TOKEN", TOKEN), ("API_ID", API_ID), ("API_HASH", API_HASH), ("PHONE", PHONE)] if not val]
+    raise ValueError(f"Missing environment variables: {', '.join(missing)}")
+
 # Настройка логирования
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -34,7 +39,7 @@ def handle_call(update: Update, context):
 
     try:
         # Инициализация Telethon клиента
-        client = TelegramClient('session', API_ID, API_HASH)
+        client = TelegramClient('session', int(API_ID), API_HASH)
         with client:
             # Получаем всех участников группы
             members = []
