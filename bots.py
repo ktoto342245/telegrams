@@ -3,6 +3,7 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 from datetime import datetime, timedelta
 import time
 import re
+from threading import Timer  # 🔧 Додано для автозняття мута
 
 # Токен бота
 TOKEN = "7752116262:AAHW5JE9WCMftH8oH4rTUGmVaS35Dta72lM"  # 🔴 Замініть на свій токен
@@ -36,26 +37,23 @@ CALL_TIMEOUT = 180  # сек
 # Функція для конвертації тривалості у секунди
 def parse_duration(duration_str):
     total_seconds = 0
-    # Регулярні вирази для кожної одиниці часу
     pattern = r'(\d+)([smhdMy])'  # Пошук чисел з одиницями часу
-    
     matches = re.findall(pattern, duration_str)
     
     for value, unit in matches:
         value = int(value)
-        if unit == 's':  # Секунди
+        if unit == 's':
             total_seconds += value
-        elif unit == 'm':  # Хвилини
+        elif unit == 'm':
             total_seconds += value * 60
-        elif unit == 'h':  # Години
+        elif unit == 'h':
             total_seconds += value * 3600
-        elif unit == 'd':  # Дні
+        elif unit == 'd':
             total_seconds += value * 86400
-        elif unit == 'M':  # Місяці
-            total_seconds += value * 2592000  # 30 днів на місяць
-        elif unit == 'y':  # Роки
-            total_seconds += value * 31536000  # 365 днів на рік
-    
+        elif unit == 'M':
+            total_seconds += value * 2592000
+        elif unit == 'y':
+            total_seconds += value * 31536000
     return total_seconds
 
 # Обробник звичайних повідомлень
@@ -72,7 +70,6 @@ def message_handler(update: Update, context: CallbackContext):
             return
 
         last_call_time[chat_id] = now
-
         extra_text = update.message.text[4:].strip()
         message = f"📣 Призов учасників:\n{USER_LIST}"
         if extra_text:
@@ -91,7 +88,6 @@ def mute_handler(update: Update, context: CallbackContext):
             update.message.reply_text("⚠️ Формат: /mut <хв> <причина>")
             return
 
-        # Парсимо тривалість за допомогою функції
         duration_str = args[0]
         duration_seconds = parse_duration(duration_str)
         
@@ -101,7 +97,6 @@ def mute_handler(update: Update, context: CallbackContext):
 
         reason = ' '.join(args[1:])
         user_to_mute = update.message.reply_to_message.from_user
-
         until_date = datetime.utcnow() + timedelta(seconds=duration_seconds)
         permissions = ChatPermissions(can_send_messages=False)
 
@@ -115,6 +110,29 @@ def mute_handler(update: Update, context: CallbackContext):
         update.message.reply_text(
             f"🔇 Користувача @{user_to_mute.username or user_to_mute.first_name} замучено на {duration_str}.\nПричина: {reason}"
         )
+
+        # 🔧 Автоматичне розм'ючування, якщо тривалість ≤ 30 секунд
+        if duration_seconds <= 30:
+            def unmute_later():
+                try:
+                    context.bot.restrict_chat_member(
+                        chat_id=update.effective_chat.id,
+                        user_id=user_to_mute.id,
+                        permissions=ChatPermissions(
+                            can_send_messages=True,
+                            can_send_media_messages=True,
+                            can_send_polls=True,
+                            can_send_other_messages=True,
+                            can_add_web_page_previews=True,
+                            can_change_info=False,
+                            can_invite_users=True,
+                            can_pin_messages=False
+                        )
+                    )
+                except Exception as e:
+                    print(f"❌ Авто unmute помилка: {e}")
+            Timer(duration_seconds, unmute_later).start()
+
     except Exception as e:
         update.message.reply_text(f"❌ Помилка при муті: {e}")
 
