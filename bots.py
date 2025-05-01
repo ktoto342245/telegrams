@@ -3,10 +3,13 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 from datetime import datetime, timedelta
 import time
 import re
-from threading import Timer  # 🔧 Додано для автозняття мута
+from threading import Timer
 
 # Токен бота
 TOKEN = "7752116262:AAHW5JE9WCMftH8oH4rTUGmVaS35Dta72lM"  # 🔴 Замініть на свій токен
+
+# Список адмінів (вкажіть Telegram ID адмінів)
+ADMINS = [123456789, 987654321]  # 🔴 Замініть на реальні Telegram ID адмінів
 
 # Список для виклику
 USER_LIST = """
@@ -56,7 +59,7 @@ def parse_duration(duration_str):
             total_seconds += value * 31536000
     return total_seconds
 
-# Обробник звичайних повідомлень
+# Обробник звичайних повідомлень (калл доступний усім)
 def message_handler(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
     now = time.time()
@@ -76,16 +79,22 @@ def message_handler(update: Update, context: CallbackContext):
             message += f"\n\n💬 Повідомлення: {extra_text}"
         update.message.reply_text(message)
 
-# Команда /mut — мут по reply
+# Команда /mut — мут по reply (тільки для адмінів)
 def mute_handler(update: Update, context: CallbackContext):
+    user_id = update.effective_user.id
+    # Перевірка, чи є користувач адміном
+    if user_id not in ADMINS:
+        update.message.reply_text("⚠️ У вас немає прав для використання цієї команди.")
+        return
+
     if not update.message.reply_to_message:
-        update.message.reply_text("⚠️ Чтобы замутить, отвечатьте на сообщения пользователя. (выда мутов 's = сек;m = мин;h = часы;d = дни;M = месяц;y = год') ")
+        update.message.reply_text("⚠️ Чтобы замутить, отвечайте на сообщение пользователя. (формат мутов: 's = сек; m = мин; h = часы; d = дни; M = месяц; y = год')")
         return
 
     try:
         args = context.args
         if len(args) < 2:
-            update.message.reply_text("⚠️ Формат: /mut <хв> <причина>")
+            update.message.reply_text("⚠️ Формат: /mut <время> <причина>")
             return
 
         duration_str = args[0]
@@ -136,10 +145,16 @@ def mute_handler(update: Update, context: CallbackContext):
     except Exception as e:
         update.message.reply_text(f"❌ Помилка при муті: {e}")
 
-# Команда /unmut — розмутити користувача
+# Команда /unmut — розмутити користувача (тільки для адмінів)
 def unmute_handler(update: Update, context: CallbackContext):
+    user_id = update.effective_user.id
+    # Перевірка, чи є користувач адміном
+    if user_id not in ADMINS:
+        update.message.reply_text("⚠️ У вас немає прав для використання цієї команди.")
+        return
+
     if not update.message.reply_to_message:
-        update.message.reply_text("⚠️ Чтобы размутить, отвечает на сообщения пользователя.")
+        update.message.reply_text("⚠️ Чтобы размутить, отвечайте на сообщение пользователя.")
         return
 
     try:
@@ -162,10 +177,10 @@ def unmute_handler(update: Update, context: CallbackContext):
         )
 
         update.message.reply_text(
-            f"🔊 Учасник @{user_to_unmute.username or user_to_unmute.first_name} розмутили."
+            f"🔊 Користувач @{user_to_unmute.username or user_to_unmute.first_name} розмучений."
         )
     except Exception as e:
-        update.message.reply_text(f"❌ Ошибка: {e}")
+        update.message.reply_text(f"❌ Помилка: {e}")
 
 # Головна функція
 def main():
