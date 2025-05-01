@@ -1,17 +1,9 @@
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 from telegram import Update
-from telethon.sync import TelegramClient
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 import logging
 
-# Впишите свои значения ниже
-TOKEN = "7752116262:AAHW5JE9WCMftH8oH4rTUGmVaS35Dta72lM"  # Токен бота от @BotFather
-API_ID = 13520503  # Ваш API ID от my.telegram.org
-API_HASH = "f7db29069679dcccf7244bc67ac0730d"  # Ваш API Hash от my.telegram.org
-PHONE = "+380661719550"  # Ваш номер телефона, например, +1234567890
-
-# Проверка наличия всех переменных
-if not all([TOKEN, API_ID, API_HASH, PHONE]):
-    raise ValueError("Все переменные (TOKEN, API_ID, API_HASH, PHONE) должны быть заполнены!")
+# Токен бота от @BotFather
+TOKEN = "7752116262:AAHW5JE9WCMftH8oH4rTUGmVaS35Dta72lM"
 
 # Настройка логирования
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -32,24 +24,22 @@ def handle_call(update: Update, context):
         return
 
     try:
-        # Инициализация Telethon клиента
-        client = TelegramClient('railway_session', API_ID, API_HASH)
-        with client:
-            # Получаем всех участников группы
-            members = []
-            for member in client.get_participants(update.message.chat_id):
-                username = member.username or member.first_name
-                if member.username:  # Упоминаем только тех, у кого есть username
-                    members.append(f"@{username}")
-                else:
-                    members.append(username)
+        # Получаем всех участников группы
+        chat_id = update.message.chat.id
+        members = update.message.chat.get_members()
 
-            if members:
-                response = "начинаю призыв:\n" + "\n".join(members)
-            else:
-                response = "Участники не найдены."
+        mentions = []
+        for member in members:
+            user = member.user
+            if not user.is_bot:
+                mentions.append(f"@{user.username}" if user.username else f"[{user.full_name}](tg://user?id={user.id})")
 
-            update.message.reply_text(response)
+        if mentions:
+            response = "Призыв начат: \n" + " ".join(mentions)
+        else:
+            response = "Участники не найдены."
+
+        update.message.reply_text(response, parse_mode="Markdown")
 
     except Exception as e:
         logger.error(f"Ошибка при получении списка участников: {e}")
