@@ -9,6 +9,14 @@ TOKEN = "7752116262:AAHW5JE9WCMftH8oH4rTUGmVaS35Dta72lM"
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Функция для обработки команды /start в ЛС
+def start(update: Update, context):
+    # Проверяем, что сообщение отправлено в личные сообщения
+    if update.message.chat.type == 'private':
+        update.message.reply_text("Привет! Я бот, который работает в группах. Напиши 'калл' в любой группе, и я покажу список администраторов!")
+    else:
+        update.message.reply_text("Эта команда работает только в личных сообщениях!")
+
 # Функция для обработки команды или текста "калл"
 def handle_call(update: Update, context):
     # Проверяем, что сообщение отправлено в группу или супергруппу
@@ -22,12 +30,6 @@ def handle_call(update: Update, context):
         # Получаем администраторов группы
         admins = context.bot.get_chat_administrators(update.message.chat_id)
         admin_ids = {admin.user.id for admin in admins}
-
-        # Получаем всех участников группы
-        # Telegram API не предоставляет прямой способ получить всех участников,
-        # поэтому мы можем только получить список администраторов и упомянуть их
-        # или использовать другой подход для активных участников.
-        # Для простоты будем выводить только администраторов, так как полный список участников недоступен через Bot API.
 
         for admin in admins:
             username = admin.user.username or admin.user.first_name
@@ -60,6 +62,9 @@ def main():
     # Создаем Updater и передаем токен
     updater = Updater(TOKEN, use_context=True)
     dp = updater.dispatcher
+
+    # Регистрируем обработчик команды /start
+    dp.add_handler(CommandHandler("start", start))
 
     # Регистрируем обработчик текстовых сообщений
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, text_handler))
