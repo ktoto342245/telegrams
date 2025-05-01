@@ -29,7 +29,7 @@ Zxc_top
 
 # Таймер останнього виклику (по chat_id)
 last_call_time = {}
-CALL_TIMEOUT = 9999999999999999999999  # в секундах
+CALL_TIMEOUT = 180  # в секундах
 
 def message_handler(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
