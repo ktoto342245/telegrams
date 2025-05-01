@@ -42,7 +42,7 @@ def message_handler(update: Update, context: CallbackContext):
         last_time = last_call_time.get(chat_id, 0)
         if now - last_time < CALL_TIMEOUT:
             remaining = int(CALL_TIMEOUT - (now - last_time))
-            update.message.reply_text(f"⏳ Зачекайте {remaining} сек. перед наступним викликом.")
+            update.message.reply_text(f"⏳ Подождите {remaining} сек. перед следуйщим вызовом.")
             return
 
         last_call_time[chat_id] = now
@@ -56,13 +56,13 @@ def message_handler(update: Update, context: CallbackContext):
 # Команда /mut — мут по reply
 def mute_handler(update: Update, context: CallbackContext):
     if not update.message.reply_to_message:
-        update.message.reply_text("⚠️ Щоб замутити, відповідай на повідомлення користувача.")
+        update.message.reply_text("⚠️Чтобы замутить, отвечатьте на сообщения пользователя.")
         return
 
     try:
         args = context.args
         if len(args) < 2:
-            update.message.reply_text("⚠️ Формат: /mut <хвилин> <причина>")
+            update.message.reply_text("⚠️ Формат: /mut <хв> <причина>")
             return
 
         duration = int(args[0])
@@ -80,15 +80,15 @@ def mute_handler(update: Update, context: CallbackContext):
         )
 
         update.message.reply_text(
-            f"🔇 Користувача @{user_to_mute.username or user_to_mute.first_name} замучено на {duration} хв.\nПричина: {reason}"
+            f"🔇 Учасник @{user_to_mute.username or user_to_mute.first_name} замучено на {duration} хв.\nПричина: {reason}"
         )
     except Exception as e:
-        update.message.reply_text(f"❌ Помилка при муті: {e}")
+        update.message.reply_text(f"❌ Ошибка при муте: {e}")
 
 # Команда /unmut — розмютити користувача
 def unmute_handler(update: Update, context: CallbackContext):
     if not update.message.reply_to_message:
-        update.message.reply_text("⚠️ Щоб розмутити, відповідай на повідомлення користувача.")
+        update.message.reply_text("⚠️ Чтобы размутить, отвечает на сообщения пользователя.")
         return
 
     try:
@@ -111,10 +111,10 @@ def unmute_handler(update: Update, context: CallbackContext):
         )
 
         update.message.reply_text(
-            f"🔊 Користувач @{user_to_unmute.username or user_to_unmute.first_name} розм’ючений."
+            f"🔊 Учасник @{user_to_unmute.username or user_to_unmute.first_name} розмутили."
         )
     except Exception as e:
-        update.message.reply_text(f"❌ Помилка при розмюті: {e}")
+        update.message.reply_text(f"❌ Ошибка: {e}")
 
 # Головна функція
 def main():
