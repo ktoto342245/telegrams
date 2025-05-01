@@ -85,6 +85,37 @@ def mute_handler(update: Update, context: CallbackContext):
     except Exception as e:
         update.message.reply_text(f"❌ Помилка при муті: {e}")
 
+# Команда /unmut — розмютити користувача
+def unmute_handler(update: Update, context: CallbackContext):
+    if not update.message.reply_to_message:
+        update.message.reply_text("⚠️ Щоб розмутити, відповідай на повідомлення користувача.")
+        return
+
+    try:
+        user_to_unmute = update.message.reply_to_message.from_user
+        permissions = ChatPermissions(
+            can_send_messages=True,
+            can_send_media_messages=True,
+            can_send_polls=True,
+            can_send_other_messages=True,
+            can_add_web_page_previews=True,
+            can_change_info=False,
+            can_invite_users=True,
+            can_pin_messages=False
+        )
+
+        context.bot.restrict_chat_member(
+            chat_id=update.effective_chat.id,
+            user_id=user_to_unmute.id,
+            permissions=permissions
+        )
+
+        update.message.reply_text(
+            f"🔊 Користувач @{user_to_unmute.username or user_to_unmute.first_name} розм’ючений."
+        )
+    except Exception as e:
+        update.message.reply_text(f"❌ Помилка при розмюті: {e}")
+
 # Головна функція
 def main():
     updater = Updater(TOKEN, use_context=True)
@@ -92,6 +123,7 @@ def main():
 
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, message_handler))
     dp.add_handler(CommandHandler("mut", mute_handler))
+    dp.add_handler(CommandHandler("unmut", unmute_handler))
 
     updater.start_polling()
     updater.idle()
