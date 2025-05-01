@@ -1,5 +1,5 @@
-from telegram import Update, ChatPermissions, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram import Update, ChatPermissions, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler
 from datetime import datetime, timedelta
 import time
 import re
@@ -30,7 +30,6 @@ Zxc_top
 last_call_time = {}
 CALL_TIMEOUT = 180
 muted_users = {}
-# Словник для зберігання ID групи для кожного користувача, який викликав /start
 user_group_mapping = {}  # {user_id: group_chat_id}
 
 def parse_duration(duration_str):
@@ -78,13 +77,9 @@ def start_handler(update: Update, context: CallbackContext):
 
     if chat_type != "private":
         try:
-            # Зберігаємо ID групи для користувача
             user_group_mapping[user_id] = update.effective_chat.id
-            
-            # Надсилаємо повідомлення в групі
             update.message.reply_text(f"@{username}, я отправил вам команды в личные сообщения!")
             
-            # Формуємо клавіатуру для користувача
             is_admin = user_id in ADMINS
             participant_commands = [
                 [KeyboardButton("калл"), KeyboardButton("/mutlist")]
@@ -95,7 +90,6 @@ def start_handler(update: Update, context: CallbackContext):
             keyboard = admin_commands if is_admin else participant_commands
             reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-            # Надсилаємо клавіатуру в приватний чат користувача
             context.bot.send_message(
                 chat_id=user_id,
                 text="Выберите команду:",
@@ -105,7 +99,6 @@ def start_handler(update: Update, context: CallbackContext):
             update.message.reply_text(f"⚠️ Не удалось отправить сообщение в личный чат. Пожалуйста, начните диалог со мной, написав /start в личных сообщениях.\nОшибка: {e}")
         return
 
-    # Якщо команда викликана в приватному чаті, показуємо клавіатуру
     is_admin = user_id in ADMINS
     participant_commands = [
         [KeyboardButton("калл"), KeyboardButton("/mutlist")]
@@ -122,15 +115,94 @@ def message_handler(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     chat_type = update.effective_chat.type
     chat_id = update.effective_chat.id
-    now = time.time()
     text = update.message.text.strip().lower()
 
+    # Перевіряємо, чи користувач вводить тривалість мута
+    if chat_type == "private" and 'mut_user' in context.user_data:
+        duration_str = update.message.text.strip()
+        duration_seconds = parse_duration(duration_str)
+        if duration_seconds == 0:
+            update.message.reply_text("⚠️ Неверный формат длительности. Пример: 1h, 30m, 5d")
+            return
+
+        context.user_data['duration'] = duration_str
+        context.user_data['duration_seconds'] = duration_seconds
+        update.message.reply_text("Введите причину мута:")
+        context.user_data['step'] = 'reason'
+        return
+
+    # Перевіряємо, чи користувач вводить причину мута
+    if chat_type == "private" and context.user_data.get('step') == 'reason':
+        reason = update.message.text.strip()
+        user_to_mute_id = context.user_data['mut_user']
+        duration_str = context.user_data['duration']
+        duration_seconds = context.user_data['duration_seconds']
+        target_chat_id = user_group_mapping.get(user_id)
+
+        try:
+            user_to_mute = context.bot.get_chat_member(target_chat_id, user_to_mute_id).user
+            until_date = datetime.utcnow() + timedelta(seconds=duration_seconds)
+            permissions = ChatPermissions(can_send_messages=False)
+
+            context.bot.restrict_chat_member(
+                chat_id=target_chat_id,
+                user_id=user_to_mute_id,
+                permissions=permissions,
+                until_date=until_date
+            )
+
+            if target_chat_id not in muted_users:
+                muted_users[target_chat_id] = {}
+            muted_users[target_chat_id][user_to_mute_id] = {
+                'username': user_to_mute.username or user_to_mute.first_name,
+                'until_date': until_date,
+                'reason': reason
+            }
+
+            context.bot.send_message(
+                chat_id=target_chat_id,
+                text=f"🔇 Пользователь @{user_to_mute.username or user_to_mute.first_name} замучен на {duration_str}.\nПричина: {reason}"
+            )
+
+            if duration_seconds <= 30:
+                def unmute_later():
+                    try:
+                        context.bot.restrict_chat_member(
+                            chat_id=target_chat_id,
+                            user_id=user_to_mute_id,
+                            permissions=ChatPermissions(
+                                can_send_messages=True,
+                                can_send_media_messages=True,
+                                can_send_polls=True,
+                                can_send_other_messages=True,
+                                can_add_web_page_previews=True,
+                                can_change_info=False,
+                                can_invite_users=True,
+                                can_pin_messages=False
+                            )
+                        )
+                        if target_chat_id in muted_users and user_to_mute_id in muted_users[target_chat_id]:
+                            del muted_users[target_chat_id][user_to_mute_id]
+                            if not muted_users[target_chat_id]:
+                                del muted_users[target_chat_id]
+                    except Exception as e:
+                        print(f"❌ Ошибка авторазмута: {e}")
+                Timer(duration_seconds, unmute_later).start()
+
+            # Очищаємо стан
+            context.user_data.clear()
+        except Exception as e:
+            update.message.reply_text(f"❌ Ошибка при муте: {e}")
+            context.user_data.clear()
+        return
+
+    # Обробка команди "калл"
     if text.startswith("калл"):
-        # Визначаємо, куди надсилати відповідь
         target_chat_id = chat_id
         if chat_type == "private" and user_id in user_group_mapping:
             target_chat_id = user_group_mapping[user_id]
 
+        now = time.time()
         last_time = last_call_time.get(target_chat_id, 0)
         if now - last_time < CALL_TIMEOUT:
             remaining = int(CALL_TIMEOUT - (now - last_time))
@@ -155,7 +227,6 @@ def mute_handler(update: Update, context: CallbackContext):
     chat_type = update.effective_chat.type
     chat_id = update.effective_chat.id
 
-    # Визначаємо, куди надсилати відповідь
     target_chat_id = chat_id
     if chat_type == "private" and user_id in user_group_mapping:
         target_chat_id = user_group_mapping[user_id]
@@ -167,94 +238,37 @@ def mute_handler(update: Update, context: CallbackContext):
         )
         return
 
-    if not update.message.reply_to_message:
+    # Отримуємо список учасників із USER_LIST
+    potential_members = USER_LIST.splitlines()
+    if not potential_members:
         context.bot.send_message(
             chat_id=target_chat_id,
-            text="⚠️ Чтобы замутить, отвечайте на сообщение пользователя. (формат мутов: 's = сек; m = мин; h = часы; d = дни; M = месяц; y = год')"
+            text="Список участников пуст."
         )
         return
 
-    try:
-        args = context.args
-        if len(args) < 2:
-            context.bot.send_message(
-                chat_id=target_chat_id,
-                text="⚠️ Формат: /mut <время> <причина>"
-            )
-            return
+    # Формуємо інлайн-клавіатуру з ніками
+    buttons = []
+    for member in potential_members:
+        member = member.strip()
+        if member:
+            # Оскільки у нас немає ID у USER_LIST, ми будемо використовувати сам нік як ідентифікатор
+            # Але для коректної роботи мута нам потрібно знати ID, тому це обмеження
+            # Для спрощення припустимо, що нік унікальний, але мутити ми будемо вручну через ID
+            buttons.append([InlineKeyboardButton(member, callback_data=f"mut_{member}")])
 
-        duration_str = args[0]
-        duration_seconds = parse_duration(duration_str)
-        
-        if duration_seconds == 0:
-            context.bot.send_message(
-                chat_id=target_chat_id,
-                text="⚠️ Неверный формат длительности."
-            )
-            return
-
-        reason = ' '.join(args[1:])
-        user_to_mute = update.message.reply_to_message.from_user
-        until_date = datetime.utcnow() + timedelta(seconds=duration_seconds)
-        permissions = ChatPermissions(can_send_messages=False)
-
-        context.bot.restrict_chat_member(
-            chat_id=target_chat_id,
-            user_id=user_to_mute.id,
-            permissions=permissions,
-            until_date=until_date
-        )
-
-        if target_chat_id not in muted_users:
-            muted_users[target_chat_id] = {}
-        muted_users[target_chat_id][user_to_mute.id] = {
-            'username': user_to_mute.username or user_to_mute.first_name,
-            'until_date': until_date,
-            'reason': reason
-        }
-
-        context.bot.send_message(
-            chat_id=target_chat_id,
-            text=f"🔇 Пользователь @{user_to_mute.username or user_to_mute.first_name} замучен на {duration_str}.\nПричина: {reason}"
-        )
-
-        if duration_seconds <= 30:
-            def unmute_later():
-                try:
-                    context.bot.restrict_chat_member(
-                        chat_id=target_chat_id,
-                        user_id=user_to_mute.id,
-                        permissions=ChatPermissions(
-                            can_send_messages=True,
-                            can_send_media_messages=True,
-                            can_send_polls=True,
-                            can_send_other_messages=True,
-                            can_add_web_page_previews=True,
-                            can_change_info=False,
-                            can_invite_users=True,
-                            can_pin_messages=False
-                        )
-                    )
-                    if target_chat_id in muted_users and user_to_mute.id in muted_users[target_chat_id]:
-                        del muted_users[target_chat_id][user_to_mute.id]
-                        if not muted_users[target_chat_id]:
-                            del muted_users[target_chat_id]
-                except Exception as e:
-                    print(f"❌ Ошибка авторазмута: {e}")
-            Timer(duration_seconds, unmute_later).start()
-
-    except Exception as e:
-        context.bot.send_message(
-            chat_id=target_chat_id,
-            text=f"❌ Ошибка при муте: {e}"
-        )
+    reply_markup = InlineKeyboardMarkup(buttons)
+    context.bot.send_message(
+        chat_id=target_chat_id,
+        text="Выберите участника для мута:",
+        reply_markup=reply_markup
+    )
 
 def unmute_handler(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     chat_type = update.effective_chat.type
     chat_id = update.effective_chat.id
 
-    # Визначаємо, куди надсилати відповідь
     target_chat_id = chat_id
     if chat_type == "private" and user_id in user_group_mapping:
         target_chat_id = user_group_mapping[user_id]
@@ -266,53 +280,86 @@ def unmute_handler(update: Update, context: CallbackContext):
         )
         return
 
-    if not update.message.reply_to_message:
+    if target_chat_id not in muted_users or not muted_users[target_chat_id]:
         context.bot.send_message(
             chat_id=target_chat_id,
-            text="⚠️ Чтобы размутить, отвечайте на сообщение пользователя."
+            text=" На данный момент нет замученных пользователей в этом чате."
         )
         return
 
-    try:
-        user_to_unmute = update.message.reply_to_message.from_user
-        permissions = ChatPermissions(
-            can_send_messages=True,
-            can_send_media_messages=True,
-            can_send_polls=True,
-            can_send_other_messages=True,
-            can_add_web_page_previews=True,
-            can_change_info=False,
-            can_invite_users=True,
-            can_pin_messages=False
-        )
+    # Формуємо інлайн-клавіатуру з замученими користувачами
+    buttons = []
+    for user_id, info in muted_users[target_chat_id].items():
+        buttons.append([InlineKeyboardButton(f"@{info['username']}", callback_data=f"unmut_{user_id}")])
 
-        context.bot.restrict_chat_member(
-            chat_id=target_chat_id,
-            user_id=user_to_unmute.id,
-            permissions=permissions
-        )
+    reply_markup = InlineKeyboardMarkup(buttons)
+    context.bot.send_message(
+        chat_id=target_chat_id,
+        text="Выберите участника для размута:",
+        reply_markup=reply_markup
+    )
 
-        if target_chat_id in muted_users and user_to_unmute.id in muted_users[target_chat_id]:
-            del muted_users[target_chat_id][user_to_unmute.id]
-            if not muted_users[target_chat_id]:
-                del muted_users[target_chat_id]
+def button_handler(update: Update, context: CallbackContext):
+    query = update.callback_query
+    query.answer()
 
-        context.bot.send_message(
-            chat_id=target_chat_id,
-            text=f"🔊 Пользователь @{user_to_unmute.username or user_to_unmute.first_name} размучен."
-        )
-    except Exception as e:
-        context.bot.send_message(
-            chat_id=target_chat_id,
-            text=f"❌ Ошибка: {e}"
-        )
+    user_id = query.from_user.id
+    target_chat_id = user_group_mapping.get(user_id)
+    if not target_chat_id:
+        query.message.reply_text("Ошибка: группа не найдена.")
+        return
+
+    data = query.data
+    action, identifier = data.split("_", 1)
+
+    if action == "mut":
+        # Для мута ми не можемо отримати ID із USER_LIST, тому попросимо адміна ввести ID вручну
+        query.message.reply_text(f"Вы выбрали {identifier}. Введите ID пользователя (можно узнать через @userinfobot):")
+        context.user_data['mut_nickname'] = identifier
+        context.user_data['step'] = 'mut_id'
+        return
+
+    if action == "unmut":
+        user_to_unmute_id = int(identifier)
+        try:
+            user_to_unmute = context.bot.get_chat_member(target_chat_id, user_to_unmute_id).user
+            permissions = ChatPermissions(
+                can_send_messages=True,
+                can_send_media_messages=True,
+                can_send_polls=True,
+                can_send_other_messages=True,
+                can_add_web_page_previews=True,
+                can_change_info=False,
+                can_invite_users=True,
+                can_pin_messages=False
+            )
+
+            context.bot.restrict_chat_member(
+                chat_id=target_chat_id,
+                user_id=user_to_unmute_id,
+                permissions=permissions
+            )
+
+            if target_chat_id in muted_users and user_to_unmute_id in muted_users[target_chat_id]:
+                del muted_users[target_chat_id][user_to_unmute_id]
+                if not muted_users[target_chat_id]:
+                    del muted_users[target_chat_id]
+
+            context.bot.send_message(
+                chat_id=target_chat_id,
+                text=f"🔊 Пользователь @{user_to_unmute.username or user_to_unmute.first_name} размучен."
+            )
+        except Exception as e:
+            context.bot.send_message(
+                chat_id=target_chat_id,
+                text=f"❌ Ошибка: {e}"
+            )
 
 def mutlist_handler(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     chat_type = update.effective_chat.type
     chat_id = update.effective_chat.id
 
-    # Визначаємо, куди надсилати відповідь
     target_chat_id = chat_id
     if chat_type == "private" and user_id in user_group_mapping:
         target_chat_id = user_group_mapping[user_id]
@@ -343,6 +390,7 @@ def main():
     dp.add_handler(CommandHandler("mut", mute_handler))
     dp.add_handler(CommandHandler("unmut", unmute_handler))
     dp.add_handler(CommandHandler("mutlist", mutlist_handler))
+    dp.add_handler(CallbackQueryHandler(button_handler))
 
     updater.start_polling()
     updater.idle()
