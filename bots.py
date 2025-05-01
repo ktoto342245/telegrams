@@ -99,6 +99,10 @@ def start_handler(update: Update, context: CallbackContext):
             update.message.reply_text(f"⚠️ Не удалось отправить сообщение в личный чат. Пожалуйста, начните диалог со мной, написав /start в личных сообщениях.\nОшибка: {e}")
         return
 
+    if user_id not in user_group_mapping:
+        update.message.reply_text("⚠️ Пожалуйста, сначала вызовите /start в группе, чтобы я знал, с какой группой работать.")
+        return
+
     is_admin = user_id in ADMINS
     participant_commands = [
         [KeyboardButton("калл"), KeyboardButton("/mutlist")]
@@ -117,8 +121,19 @@ def message_handler(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
     text = update.message.text.strip().lower()
 
+    # Перевіряємо, чи користувач вводить ID для мута
+    if chat_type == "private" and context.user_data.get('step') == 'mut_id':
+        try:
+            user_to_mute_id = int(update.message.text.strip())
+            context.user_data['mut_user'] = user_to_mute_id
+            update.message.reply_text("Введите длительность мута (например, 1h, 30m, 5d):")
+            context.user_data['step'] = 'duration'
+        except ValueError:
+            update.message.reply_text("⚠️ ID должен быть числом. Попробуйте снова:")
+        return
+
     # Перевіряємо, чи користувач вводить тривалість мута
-    if chat_type == "private" and 'mut_user' in context.user_data:
+    if chat_type == "private" and context.user_data.get('step') == 'duration':
         duration_str = update.message.text.strip()
         duration_seconds = parse_duration(duration_str)
         if duration_seconds == 0:
@@ -138,6 +153,11 @@ def message_handler(update: Update, context: CallbackContext):
         duration_str = context.user_data['duration']
         duration_seconds = context.user_data['duration_seconds']
         target_chat_id = user_group_mapping.get(user_id)
+
+        if not target_chat_id:
+            update.message.reply_text("⚠️ Группа не найдена. Пожалуйста, вызовите /start в группе.")
+            context.user_data.clear()
+            return
 
         try:
             user_to_mute = context.bot.get_chat_member(target_chat_id, user_to_mute_id).user
@@ -189,7 +209,6 @@ def message_handler(update: Update, context: CallbackContext):
                         print(f"❌ Ошибка авторазмута: {e}")
                 Timer(duration_seconds, unmute_later).start()
 
-            # Очищаємо стан
             context.user_data.clear()
         except Exception as e:
             update.message.reply_text(f"❌ Ошибка при муте: {e}")
@@ -199,8 +218,12 @@ def message_handler(update: Update, context: CallbackContext):
     # Обробка команди "калл"
     if text.startswith("калл"):
         target_chat_id = chat_id
-        if chat_type == "private" and user_id in user_group_mapping:
-            target_chat_id = user_group_mapping[user_id]
+        if chat_type == "private":
+            target_chat_id = user_group_mapping.get(user_id)
+
+        if not target_chat_id:
+            update.message.reply_text("⚠️ Группа не найдена. Пожалуйста, вызовите /start в группе.")
+            return
 
         now = time.time()
         last_time = last_call_time.get(target_chat_id, 0)
@@ -228,8 +251,12 @@ def mute_handler(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
 
     target_chat_id = chat_id
-    if chat_type == "private" and user_id in user_group_mapping:
-        target_chat_id = user_group_mapping[user_id]
+    if chat_type == "private":
+        target_chat_id = user_group_mapping.get(user_id)
+
+    if not target_chat_id:
+        update.message.reply_text("⚠️ Группа не найдена. Пожалуйста, вызовите /start в группе.")
+        return
 
     if user_id not in ADMINS:
         context.bot.send_message(
@@ -238,7 +265,6 @@ def mute_handler(update: Update, context: CallbackContext):
         )
         return
 
-    # Отримуємо список учасників із USER_LIST
     potential_members = USER_LIST.splitlines()
     if not potential_members:
         context.bot.send_message(
@@ -247,14 +273,10 @@ def mute_handler(update: Update, context: CallbackContext):
         )
         return
 
-    # Формуємо інлайн-клавіатуру з ніками
     buttons = []
     for member in potential_members:
         member = member.strip()
         if member:
-            # Оскільки у нас немає ID у USER_LIST, ми будемо використовувати сам нік як ідентифікатор
-            # Але для коректної роботи мута нам потрібно знати ID, тому це обмеження
-            # Для спрощення припустимо, що нік унікальний, але мутити ми будемо вручну через ID
             buttons.append([InlineKeyboardButton(member, callback_data=f"mut_{member}")])
 
     reply_markup = InlineKeyboardMarkup(buttons)
@@ -270,8 +292,12 @@ def unmute_handler(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
 
     target_chat_id = chat_id
-    if chat_type == "private" and user_id in user_group_mapping:
-        target_chat_id = user_group_mapping[user_id]
+    if chat_type == "private":
+        target_chat_id = user_group_mapping.get(user_id)
+
+    if not target_chat_id:
+        update.message.reply_text("⚠️ Группа не найдена. Пожалуйста, вызовите /start в группе.")
+        return
 
     if user_id not in ADMINS:
         context.bot.send_message(
@@ -287,7 +313,6 @@ def unmute_handler(update: Update, context: CallbackContext):
         )
         return
 
-    # Формуємо інлайн-клавіатуру з замученими користувачами
     buttons = []
     for user_id, info in muted_users[target_chat_id].items():
         buttons.append([InlineKeyboardButton(f"@{info['username']}", callback_data=f"unmut_{user_id}")])
@@ -306,14 +331,13 @@ def button_handler(update: Update, context: CallbackContext):
     user_id = query.from_user.id
     target_chat_id = user_group_mapping.get(user_id)
     if not target_chat_id:
-        query.message.reply_text("Ошибка: группа не найдена.")
+        query.message.reply_text("⚠️ Группа не найдена. Пожалуйста, вызовите /start в группе.")
         return
 
     data = query.data
     action, identifier = data.split("_", 1)
 
     if action == "mut":
-        # Для мута ми не можемо отримати ID із USER_LIST, тому попросимо адміна ввести ID вручну
         query.message.reply_text(f"Вы выбрали {identifier}. Введите ID пользователя (можно узнать через @userinfobot):")
         context.user_data['mut_nickname'] = identifier
         context.user_data['step'] = 'mut_id'
@@ -361,8 +385,12 @@ def mutlist_handler(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
 
     target_chat_id = chat_id
-    if chat_type == "private" and user_id in user_group_mapping:
-        target_chat_id = user_group_mapping[user_id]
+    if chat_type == "private":
+        target_chat_id = user_group_mapping.get(user_id)
+
+    if not target_chat_id:
+        update.message.reply_text("⚠️ Группа не найдена. Пожалуйста, вызовите /start в группе.")
+        return
 
     if target_chat_id not in muted_users or not muted_users[target_chat_id]:
         context.bot.send_message(
