@@ -9,7 +9,7 @@ from threading import Timer
 TOKEN = "7752116262:AAHW5JE9WCMftH8oH4rTUGmVaS35Dta72lM"  # 🔴 Замініть на свій токен
 
 # Список адмінів (вкажіть Telegram ID адмінів)
-ADMINS = [123456789, 987654321]  # 🔴 Замініть на реальні Telegram ID адмінів
+ADMINS = [7896946163, 7137133015, 7618906705]  # 🔴 Замініть на реальні Telegram ID адмінів
 
 # Список для виклику
 USER_LIST = """
