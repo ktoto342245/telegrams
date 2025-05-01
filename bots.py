@@ -30,7 +30,7 @@ Zxc_top
 last_call_time = {}
 CALL_TIMEOUT = 180
 muted_users = {}
-user_group_mapping = {}  # {user_id: group_chat_id}
+user_group_mapping = {}
 
 def parse_duration(duration_str):
     total_seconds = 0
@@ -136,8 +136,8 @@ def message_handler(update: Update, context: CallbackContext):
     if chat_type == "private" and context.user_data.get('step') == 'duration':
         duration_str = update.message.text.strip()
         duration_seconds = parse_duration(duration_str)
-        if duration_seconds == 0:
-            update.message.reply_text("⚠️ Неверный формат длительности. Пример: 1h, 30m, 5d")
+        if duration_seconds < 30:  # Telegram API не дозволяє мут менше 30 секунд
+            update.message.reply_text("⚠️ Длительность мута должна быть не менее 30 секунд. Пример: 30s, 1m, 1h")
             return
 
         context.user_data['duration'] = duration_str
