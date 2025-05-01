@@ -74,7 +74,13 @@ def format_time_remaining(until_date):
     return f"{days} дн."
 
 def start_handler(update: Update, context: CallbackContext):
+    chat_type = update.effective_chat.type
     user_id = update.effective_user.id
+    
+    if chat_type != "private":
+        update.message.reply_text("Пожалуйста, напишите /start в личных сообщениях боту, чтобы увидеть команды.")
+        return
+
     is_admin = user_id in ADMINS
 
     participant_commands = [
