@@ -94,11 +94,11 @@ def start_handler(update: Update, context: CallbackContext):
             # Надсилаємо клавіатуру в приватний чат користувача
             context.bot.send_message(
                 chat_id=user_id,
-                text=" ",
+                text="Выберите команду:",
                 reply_markup=reply_markup
             )
         except Exception as e:
-            update.message.reply_text(f"⚠️ Не удалось отправить сообщение в личный чат. Пожалуйста, напишите мне в личные сообщения: /start\nОшибка: {e}")
+            update.message.reply_text(f"⚠️ Не удалось отправить сообщение в личный чат. Пожалуйста, начните диалог со мной, написав /start в личных сообщениях.\nОшибка: {e}")
         return
 
     # Якщо команда викликана в приватному чаті, показуємо клавіатуру
@@ -112,7 +112,7 @@ def start_handler(update: Update, context: CallbackContext):
     keyboard = admin_commands if is_admin else participant_commands
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-    update.message.reply_text(" ", reply_markup=reply_markup)
+    update.message.reply_text("Выберите команду:", reply_markup=reply_markup)
 
 def message_handler(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
