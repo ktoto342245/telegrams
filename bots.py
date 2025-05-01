@@ -1,5 +1,6 @@
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+from telegram.ext import CallbackContext
 import logging
 
 # Токен бота от @BotFather
@@ -10,23 +11,25 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 # Функция для обработки команды /start в ЛС
-def start(update: Update, context):
+def start(update: Update, context: CallbackContext):
     if update.message.chat.type == 'private':
         update.message.reply_text("Привет! Я бот, который работает в группах. Напиши слово 'калл' в любой группе, и я упомяну всех участников!")
     else:
         update.message.reply_text("Эта команда работает только в личных сообщениях!")
 
 # Функция для обработки текста "калл"
-def handle_call(update: Update, context):
+def handle_call(update: Update, context: CallbackContext):
     logger.info(f"Получено сообщение в чате {update.message.chat_id}")
     if update.message.chat.type not in ['group', 'supergroup']:
         update.message.reply_text("Этот бот работает только в группах!")
         return
 
     try:
-        # Получаем всех участников группы
-        chat_id = update.message.chat.id
-        members = update.message.chat.get_members()
+        # Получаем объект бота
+        bot = context.bot
+
+        # Получаем список участников чата
+        members = bot.get_chat_members(update.message.chat.id)
 
         mentions = []
         for member in members:
@@ -46,14 +49,14 @@ def handle_call(update: Update, context):
         update.message.reply_text(f"Произошла ошибка: {str(e)}")
 
 # Функция для обработки текстовых сообщений
-def text_handler(update: Update, context):
+def text_handler(update: Update, context: CallbackContext):
     message_text = update.message.text.lower().strip()
     logger.info(f"Получен текст: {message_text}")
     if "калл" in message_text:  # Проверяем наличие слова "калл"
         handle_call(update, context)
 
 # Функция для обработки ошибок
-def error_handler(update: Update, context):
+def error_handler(update: Update, context: CallbackContext):
     logger.error(f"Update {update} caused error {context.error}")
 
 def main():
