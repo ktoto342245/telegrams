@@ -160,7 +160,14 @@ def message_handler(update: Update, context: CallbackContext):
             return
 
         try:
-            user_to_mute = context.bot.get_chat_member(target_chat_id, user_to_mute_id).user
+            # Перевіряємо статус користувача
+            chat_member = context.bot.get_chat_member(target_chat_id, user_to_mute_id)
+            if chat_member.status in ['administrator', 'creator']:
+                update.message.reply_text("⚠️ Нельзя замутить администратора чата.")
+                context.user_data.clear()
+                return
+
+            user_to_mute = chat_member.user
             until_date = datetime.utcnow() + timedelta(seconds=duration_seconds)
             permissions = ChatPermissions(can_send_messages=False)
 
@@ -211,7 +218,10 @@ def message_handler(update: Update, context: CallbackContext):
 
             context.user_data.clear()
         except Exception as e:
-            update.message.reply_text(f"❌ Ошибка при муте: {e}")
+            if "administrator of the chat" in str(e):
+                update.message.reply_text("⚠️ Нельзя замутить администратора чата.")
+            else:
+                update.message.reply_text(f"❌ Ошибка при муте: {e}")
             context.user_data.clear()
         return
 
