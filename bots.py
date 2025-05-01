@@ -30,7 +30,7 @@ Zxc_top
 last_call_time = {}
 CALL_TIMEOUT = 180
 muted_users = {}
-user_group_mapping = {-1002553267167}  # {user_id: group_chat_id}
+user_group_mapping = {}  # {user_id: group_chat_id}
 
 def parse_duration(duration_str):
     total_seconds = 0
