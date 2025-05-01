@@ -9,10 +9,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Переменные окружения
-TOKEN = os.getenv("7752116262:AAHW5JE9WCMftH8oH4rTUGmVaS35Dta72lM")
-API_ID = os.getenv("13520503")
-API_HASH = os.getenv("f7db29069679dcccf7244bc67ac0730d")
-PHONE = os.getenv("+380661719550")
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+API_ID = os.getenv("TELEGRAM_API_ID")
+API_HASH = os.getenv("TELEGRAM_API_HASH")
+PHONE = os.getenv("TELEGRAM_PHONE")
 
 # Проверка наличия всех переменных
 if not all([TOKEN, API_ID, API_HASH, PHONE]):
