@@ -2,7 +2,7 @@ from telegram import Update
 from telegram.ext import Updater, MessageHandler, Filters, CallbackContext
 
 # Токен бота
-TOKEN = "ВАШ_ТОКЕН_ТУТ"  # Заміни на свій токен
+TOKEN = "7752116262:AAHW5JE9WCMftH8oH4rTUGmVaS35Dta72lM"  # Заміни на свій токен
 
 # Готовий список користувачів
 USER_LIST = """
