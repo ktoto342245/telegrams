@@ -1,12 +1,12 @@
 from telegram import Update, ChatPermissions
-from telegram.ext import Updater, MessageHandler, Filters, CallbackContext, CommandHandler
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from datetime import datetime, timedelta
 import time
-from datetime import timedelta
 
 # Токен бота
-TOKEN = "7752116262:AAHW5JE9WCMftH8oH4rTUGmVaS35Dta72lM"  # Замініть на свій токен
+TOKEN = "ВАШ_ТОКЕН_ТУТ"  # 🔴 Замініть на свій токен
 
-# Готовий список користувачів
+# Список для виклику
 USER_LIST = """
 @kall_help_bot 
 @Helpmepls53 
@@ -28,70 +28,60 @@ Zxc_top
 @TOR_7_77
 """
 
-# Таймер останнього виклику (по chat_id)
+# Таймер для "калл"
 last_call_time = {}
-CALL_TIMEOUT = 180  # в секундах
+CALL_TIMEOUT = 180  # сек
 
+# Обробник звичайних повідомлень
 def message_handler(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
     now = time.time()
-    text = update.message.text.strip()
+    text = update.message.text.strip().lower()
 
-    if text.lower().startswith("калл"):
+    if text.startswith("калл"):
         last_time = last_call_time.get(chat_id, 0)
         if now - last_time < CALL_TIMEOUT:
             remaining = int(CALL_TIMEOUT - (now - last_time))
-            update.message.reply_text(f"⏳ Подождите {remaining} сек. перед следующим вызовом.")
+            update.message.reply_text(f"⏳ Зачекайте {remaining} сек. перед наступним викликом.")
             return
 
-        # Обновляем время последнего вызова
         last_call_time[chat_id] = now
 
-        extra_text = text[4:].strip()  # Все, що після "калл"
-        message = f"Призыв начат:\n{USER_LIST}"
+        extra_text = update.message.text[4:].strip()
+        message = f"📣 Призов учасників:\n{USER_LIST}"
         if extra_text:
-            message += f"\n\n📣 Сообщение от пользователя:\n{extra_text}"
+            message += f"\n\n💬 Повідомлення: {extra_text}"
         update.message.reply_text(message)
 
-# Команда /mut
+# Команда /mut — мут по reply
 def mute_handler(update: Update, context: CallbackContext):
+    if not update.message.reply_to_message:
+        update.message.reply_text("⚠️ Щоб замутити, відповідай на повідомлення користувача.")
+        return
+
     try:
-        args = update.message.text.split(maxsplit=3)
-        if len(args) < 4:
-            update.message.reply_text("⚠️ Формат: /mut <хвилин> <причина> @username")
+        args = context.args
+        if len(args) < 2:
+            update.message.reply_text("⚠️ Формат: /mut <хвилин> <причина>")
             return
 
-        duration = int(args[1])
-        reason = args[2]
-        username = args[3].lstrip("@")
+        duration = int(args[0])
+        reason = ' '.join(args[1:])
+        user_to_mute = update.message.reply_to_message.from_user
 
-        chat = update.effective_chat
-
-        # Отримання користувача по username
-        member = chat.get_member(update.message.reply_to_message.from_user.id) if update.message.reply_to_message else None
-        if not member:
-            for user_id in range(1, 10000):  # умовно
-                try:
-                    member = chat.get_member(user_id)
-                    if member.user.username and member.user.username.lower() == username.lower():
-                        break
-                except:
-                    continue
-        if not member:
-            update.message.reply_text("❌ Користувача не знайдено.")
-            return
-
-        until_date = update.message.date + timedelta(minutes=duration)
+        until_date = datetime.utcnow() + timedelta(minutes=duration)
         permissions = ChatPermissions(can_send_messages=False)
 
         context.bot.restrict_chat_member(
-            chat_id=chat.id,
-            user_id=member.user.id,
+            chat_id=update.effective_chat.id,
+            user_id=user_to_mute.id,
             permissions=permissions,
             until_date=until_date
         )
 
-        update.message.reply_text(f"🔇 @{member.user.username} замучений на {duration} хвилин. Причина: {reason}")
+        update.message.reply_text(
+            f"🔇 Користувача @{user_to_mute.username or user_to_mute.first_name} замучено на {duration} хв.\nПричина: {reason}"
+        )
     except Exception as e:
         update.message.reply_text(f"❌ Помилка при муті: {e}")
 
