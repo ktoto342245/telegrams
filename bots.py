@@ -33,7 +33,7 @@ def handle_call(update: Update, context):
 
     try:
         # Инициализация Telethon клиента
-        client = TelegramClient('session', API_ID, API_HASH)
+        client = TelegramClient('railway_session', API_ID, API_HASH)
         with client:
             # Получаем всех участников группы
             members = []
