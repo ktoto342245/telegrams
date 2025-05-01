@@ -1,5 +1,5 @@
-from telegram import Update, ChatPermissions, ReplyKeyboardMarkup, KeyboardButton
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
+from telegram import Update, ChatPermissions, InlineKeyboardMarkup, InlineKeyboardButton
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext, CallbackQueryHandler
 from datetime import datetime, timedelta
 import time
 import re
@@ -34,6 +34,9 @@ last_call_time = {}
 CALL_TIMEOUT = 180
 
 muted_users = {}
+
+# Словник для зберігання ID користувача, який викликав /start, для кожної інлайн-клавіатури
+start_callers = {}
 
 def parse_duration(duration_str):
     total_seconds = 0
@@ -74,27 +77,82 @@ def format_time_remaining(until_date):
     return f"{days} дн."
 
 def start_handler(update: Update, context: CallbackContext):
-    chat_type = update.effective_chat.type
     user_id = update.effective_user.id
-    
-    if chat_type != "private":
-        update.message.reply_text("Пожалуйста, напишите /start в личных сообщениях боту, чтобы увидеть команды.")
-        return
+    chat_id = update.effective_chat.id
+    message_id = update.message.message_id
 
     is_admin = user_id in ADMINS
 
-    participant_commands = [
-        [KeyboardButton("калл"), KeyboardButton("/mutlist")]
+    participant_buttons = [
+        [InlineKeyboardButton("калл", callback_data=f"call_{user_id}_{chat_id}"),
+         InlineKeyboardButton("/mutlist", callback_data=f"mutlist_{user_id}_{chat_id}")]
     ]
     
-    admin_commands = participant_commands + [
-        [KeyboardButton("/mut"), KeyboardButton("/unmut")]
+    admin_buttons = participant_buttons + [
+        [InlineKeyboardButton("/mut", callback_data=f"mut_{user_id}_{chat_id}"),
+         InlineKeyboardButton("/unmut", callback_data=f"unmut_{user_id}_{chat_id}")]
     ]
 
-    keyboard = admin_commands if is_admin else participant_commands
-    reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+    keyboard = admin_buttons if is_admin else participant_buttons
+    reply_markup = InlineKeyboardMarkup(keyboard)
 
-    update.message.reply_text(" ", reply_markup=reply_markup)
+    # Зберігаємо ID користувача, який викликав /start, разом із message_id
+    start_callers[message_id] = user_id
+
+    update.message.reply_text("Выберите команду:", reply_markup=reply_markup)
+
+def button_handler(update: Update, context: CallbackContext):
+    query = update.callback_query
+    query.answer()
+
+    user_id = query.from_user.id
+    chat_id = query.message.chat_id
+    message_id = query.message.message_id
+
+    # Перевіряємо, чи той, хто натиснув кнопку, є тим, хто викликав /start
+    if message_id not in start_callers or start_callers[message_id] != user_id:
+        query.message.reply_text("Эта команда доступна только тому, кто вызвал /start.")
+        return
+
+    data = query.data
+    action, caller_id, chat_id_from_button = data.split("_")
+    chat_id_from_button = int(chat_id_from_button)
+
+    if action == "call":
+        now = time.time()
+        last_time = last_call_time.get(chat_id, 0)
+        if now - last_time < CALL_TIMEOUT:
+            remaining = int(CALL_TIMEOUT - (now - last_time))
+            query.message.reply_text(f"⏳ Подождите {remaining} сек. перед следующим вызовом.")
+            return
+
+        last_call_time[chat_id] = now
+        message = f"📣 Призыв участников:\n{USER_LIST}"
+        query.message.reply_text(message)
+
+    elif action == "mutlist":
+        if chat_id_from_button not in muted_users or not muted_users[chat_id_from_button]:
+            query.message.reply_text("📋 На данный момент нет замученных пользователей в этом чате.")
+            return
+
+        message = "📋 Список замученных пользователей:\n"
+        for user_id, info in muted_users[chat_id_from_button].items():
+            time_remaining = format_time_remaining(info['until_date'])
+            message += f"👤 @{info['username']} — до {time_remaining}\nПричина: {info['reason']}\n"
+        
+        query.message.reply_text(message)
+
+    elif action == "mut":
+        if user_id not in ADMINS:
+            query.message.reply_text("⚠️ У вас нет прав для использования этой команды.")
+            return
+        query.message.reply_text("Чтобы замутить, ответьте на сообщение пользователя командой /mut <время> <причина>")
+
+    elif action == "unmut":
+        if user_id not in ADMINS:
+            query.message.reply_text("⚠️ У вас нет прав для использования этой команды.")
+            return
+        query.message.reply_text("Чтобы размутить, ответьте на сообщение пользователя командой /unmut")
 
 def message_handler(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
@@ -250,6 +308,7 @@ def main():
     dp = updater.dispatcher
 
     dp.add_handler(CommandHandler("start", start_handler))
+    dp.add_handler(CallbackQueryHandler(button_handler))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, message_handler))
     dp.add_handler(CommandHandler("mut", mute_handler))
     dp.add_handler(CommandHandler("unmut", unmute_handler))
