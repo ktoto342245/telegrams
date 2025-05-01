@@ -12,7 +12,7 @@ load_dotenv()
 TOKEN = os.getenv("7752116262:AAHW5JE9WCMftH8oH4rTUGmVaS35Dta72lM")
 API_ID = os.getenv("13520503")
 API_HASH = os.getenv("f7db29069679dcccf7244bc67ac0730d")
-PHONE = os.getenv("+380 66 171 95 50")
+PHONE = os.getenv("+380661719550")
 
 # Проверка наличия всех переменных
 if not all([TOKEN, API_ID, API_HASH, PHONE]):
