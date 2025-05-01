@@ -1,1 +1,1 @@
-pip install python-telegram-bot
+pip freeze > requirements.txt
