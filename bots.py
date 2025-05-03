@@ -6,7 +6,7 @@ import re
 from threading import Timer
 
 # Конфигурация
-TOKEN = "7752116262:AAHW5JE9WCMftH8oH4rTUGmVaS35Dta72lM"
+TOKEN = "7892810911:AAEnKZ1dbsax6LwK2TfoihCvhCOqupBaEfE"
 ADMINS = [7896946163, 7137133015, 7618906705]
 USER_LIST = """
 @kall_help_bot 
