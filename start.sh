@@ -1,1 +1,1 @@
-python bots.py
+python bots6.py
