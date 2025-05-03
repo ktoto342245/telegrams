@@ -131,7 +131,7 @@ def clear_chat_handler(update: Update, context: CallbackContext):
     try:
         pinned_message_id = context.bot.get_chat(target_chat_id).pinned_message.message_id if context.bot.get_chat(target_chat_id).pinned_message else None
         message_id = update.message.message_id
-        for i in range(message_id, message_id - 1000000, -1):
+        for i in range(message_id, message_id - 9999, -1):
             if i != pinned_message_id:
                 try:
                     context.bot.delete_message(chat_id=target_chat_id, message_id=i)
