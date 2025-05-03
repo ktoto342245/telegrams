@@ -129,15 +129,18 @@ def clear_chat_handler(update: Update, context: CallbackContext):
             return
 
     try:
-        pinned_message_id = context.bot.get_chat(target_chat_id).pinned_message.message_id if context.bot.get_chat(target_chat_id).pinned_message else None
         message_id = update.message.message_id
-        for i in range(message_id, message_id - 9999, -1):
-            if i != pinned_message_id:
-                try:
-                    context.bot.delete_message(chat_id=target_chat_id, message_id=i)
-                except:
-                    continue
-        update.message.reply_text("Чат очищен, кроме закреплённого сообщения!")
+        deleted_count = 0
+        while message_id > 1:  # Telegram message IDs start at 1
+            try:
+                context.bot.delete_message(chat_id=target_chat_id, message_id=message_id)
+                deleted_count += 1
+                message_id -= 1
+                time.sleep(0.05)  # Avoid rate limits
+            except:
+                message_id -= 1  # Skip if message can't be deleted (e.g., too old)
+                continue
+        update.message.reply_text(f"Чат полностью очищен! Удалено {deleted_count} сообщений.")
     except Exception as e:
         update.message.reply_text(f"Ошибка при очистке: {e}")
 
@@ -361,7 +364,7 @@ def button_handler(update: Update, context: CallbackContext):
     query.answer()
 
     user_id = query.from_user.id
-    target_chat_id = user_group_mapping.get(user_id)
+    target    target_chat_id = user_group_mapping.get(user_id)
     if not target_chat_id:
         query.message.reply_text("Напиши /start в группе!")
         return
