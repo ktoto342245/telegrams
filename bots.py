@@ -5,7 +5,8 @@ import time
 import re
 from threading import Timer
 
-TOKEN = "7892810911:AAEnKZ1dbsax6LwK2TfoihCvhCOqupBaEfE"
+# Конфигурация
+TOKEN = "7752116262:AAHW5JE9WCMftH8oH4rTUGmVaS35Dta72lM"
 ADMINS = [7896946163, 7137133015, 7618906705]
 USER_LIST = """
 @kall_help_bot 
@@ -27,15 +28,18 @@ Zxc_top
 @COBA_31 
 @TOR_7_77
 """
-last_call_time = {}
-CALL_TIMEOUT = 180
-muted_users = {}
-user_group_mapping = {}
+CALL_TIMEOUT = 180  # Таймаут между командами "калл" в секундах
 
-def parse_duration(duration_str):
+# Глобальные хранилища
+last_call_time = {}  # Время последнего вызова "калл" для каждого чата
+muted_users = {}  # Список замученных пользователей по чатам
+user_group_mapping = {}  # Соответствие пользователя и группы
+
+def parse_duration(duration_str: str) -> int:
+    """Преобразует строку длительности (например, '1h30m') в секунды."""
     total_seconds = 0
     pattern = r'(\d+)([smhdMy])'
-    matches = re.findall(pattern, duration_str)
+    matches = re.findall(pattern, duration_str.lower())
     
     for value, unit in matches:
         value = int(value)
@@ -53,7 +57,8 @@ def parse_duration(duration_str):
             total_seconds += value * 31536000
     return total_seconds
 
-def format_time_remaining(until_date):
+def format_time_remaining(until_date: datetime) -> str:
+    """Форматирует оставшееся время мута в читаемый вид."""
     now = datetime.utcnow()
     delta = until_date - now
     if delta.total_seconds() <= 0:
@@ -70,34 +75,56 @@ def format_time_remaining(until_date):
     days = hours // 24
     return f"{days} дн."
 
+def get_target_chat_id(user_id: int, chat_id: int, chat_type: str) -> int:
+    """Возвращает ID целевого чата (группы) для команд."""
+    if chat_type == "private":
+        target_chat_id = user_group_mapping.get(user_id)
+        if not target_chat_id:
+            return None
+        return target_chat_id
+    return chat_id
+
+def check_admin_rights(user_id: int, context: CallbackContext, chat_id: int) -> bool:
+    """Проверяет, является ли пользователь админом."""
+    if user_id not in ADMINS:
+        context.bot.send_message(chat_id=chat_id, text="⚠️ У вас нет прав для этой команды.")
+        return False
+    return True
+
 def start_handler(update: Update, context: CallbackContext):
+    """Обработчик команды /start."""
     user_id = update.effective_user.id
     username = update.effective_user.username or update.effective_user.first_name
     chat_type = update.effective_chat.type
 
     if chat_type != "private":
-        user_group_mapping[user_id] = update.effective_chat.id
-        update.message.reply_text(f"@{username}, я отправил команды в личку!")
-        
-        is_admin = user_id in ADMINS
-        participant_commands = [
-            [KeyboardButton("калл"), KeyboardButton("/mutlist")]
-        ]
-        admin_commands = participant_commands + [
-            [KeyboardButton("/mut"), KeyboardButton("/unmut"), KeyboardButton("очистка чата")]
-        ]
-        keyboard = admin_commands if is_admin else participant_commands
-        reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
+        try:
+            user_group_mapping[user_id] = update.effective_chat.id
+            update.message.reply_text(f"@{username}, я отправил команды в личные сообщения!")
+            
+            is_admin = user_id in ADMINS
+            participant_commands = [
+                [KeyboardButton("калл"), KeyboardButton("/mutlist")]
+            ]
+            admin_commands = participant_commands + [
+                [KeyboardButton("/mut"), KeyboardButton("/unmut")]
+            ]
+            keyboard = admin_commands if is_admin else participant_commands
+            reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-        context.bot.send_message(
-            chat_id=user_id,
-            text="Выбери команду:",
-            reply_markup=reply_markup
-        )
+            context.bot.send_message(
+                chat_id=user_id,
+                text="Выберите команду:",
+                reply_markup=reply_markup
+            )
+        except Exception as e:
+            update.message.reply_text(
+                f"⚠️ Не удалось отправить сообщение в личные сообщения. Напишите /start в личку.\nОшибка: {e}"
+            )
         return
 
     if user_id not in user_group_mapping:
-        update.message.reply_text("Сначала напиши /start в группе!")
+        update.message.reply_text("⚠️ Сначала вызовите /start в группе!")
         return
 
     is_admin = user_id in ADMINS
@@ -105,117 +132,62 @@ def start_handler(update: Update, context: CallbackContext):
         [KeyboardButton("калл"), KeyboardButton("/mutlist")]
     ]
     admin_commands = participant_commands + [
-        [KeyboardButton("/mut"), KeyboardButton("/unmut"), KeyboardButton("очистка чата")]
+        [KeyboardButton("/mut"), KeyboardButton("/unmut")]
     ]
     keyboard = admin_commands if is_admin else participant_commands
     reply_markup = ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
-    update.message.reply_text("Выбери команду:", reply_markup=reply_markup)
-
-def clear_chat_handler(update: Update, context: CallbackContext):
-    user_id = update.effective_user.id
-    chat_id = update.effective_chat.id
-    chat_type = update.effective_chat.type
-
-    if user_id not in ADMINS:
-        update.message.reply_text("Только админы могут чистить чат!")
-        return
-
-    target_chat_id = chat_id
-    if chat_type == "private":
-        target_chat_id = user_group_mapping.get(user_id)
-        if not target_chat_id:
-            update.message.reply_text("Сначала напиши /start в группе!")
-            return
-
-    try:
-        # Проверяем, есть ли у бота права администратора
-        bot_member = context.bot.get_chat_member(target_chat_id, context.bot.id)
-        if not bot_member.can_delete_messages:
-            update.message.reply_text("У меня нет прав на удаление сообщений! Сделай меня админом с правом 'Удалять сообщения'.")
-            return
-
-        # Получаем ID закреплённого сообщения, если оно есть
-        pinned_message_id = context.bot.get_chat(target_chat_id).pinned_message.message_id if context.bot.get_chat(target_chat_id).pinned_message else None
-
-        message_id = update.message.message_id
-        deleted_count = 0
-        update.message.reply_text("Начинаю очистку чата... Это может занять время.")
-
-        while message_id > 1:  # Telegram message IDs начинаются с 1
-            try:
-                # Пропускаем закреплённое сообщение
-                if pinned_message_id and message_id == pinned_message_id:
-                    message_id -= 1
-                    continue
-                context.bot.delete_message(chat_id=target_chat_id, message_id=message_id)
-                deleted_count += 1
-                message_id -= 1
-                # Показываем прогресс каждые 100 сообщений
-                if deleted_count % 100 == 0:
-                    context.bot.send_message(chat_id=target_chat_id, text=f"Удалено {deleted_count} сообщений...")
-                time.sleep(0.02)  # Уменьшенная задержка для скорости
-            except Exception as e:
-                # Пропускаем сообщения, которые нельзя удалить (например, старше 48 часов)
-                message_id -= 1
-                continue
-
-        context.bot.send_message(
-            chat_id=target_chat_id,
-            text=f"Очистка завершена! Удалено {deleted_count} сообщений, кроме закреплённого. Сообщения старше 48 часов не могут быть удалены из-за ограничений Telegram."
-        )
-    except Exception as e:
-        update.message.reply_text(f"Ошибка при очистке: {e}")
+    update.message.reply_text("Выберите команду:", reply_markup=reply_markup)
 
 def message_handler(update: Update, context: CallbackContext):
+    """Обработчик текстовых сообщений."""
     user_id = update.effective_user.id
     chat_type = update.effective_chat.type
     chat_id = update.effective_chat.id
     text = update.message.text.strip().lower()
 
-    if text == "очистка чата":
-        clear_chat_handler(update, context)
-        return
-
+    # Обработка ввода ID для мута
     if chat_type == "private" and context.user_data.get('step') == 'mut_id':
         try:
-            user_to_mute_id = int(update.message.text.strip())
+            user_to_mute_id = int(text.strip())
             context.user_data['mut_user'] = user_to_mute_id
-            update.message.reply_text("Введи время мута (например, 1h, 30m):")
+            update.message.reply_text("Введите длительность мута (например, 1h, 30m, 5d):")
             context.user_data['step'] = 'duration'
         except ValueError:
-            update.message.reply_text("ID должен быть числом. Попробуй ещё:")
+            update.message.reply_text("⚠️ ID должен быть числом. Попробуйте снова:")
         return
 
+    # Обработка ввода длительности мута
     if chat_type == "private" and context.user_data.get('step') == 'duration':
-        duration_str = update.message.text.strip()
+        duration_str = text.strip()
         duration_seconds = parse_duration(duration_str)
         if duration_seconds < 30:
-            update.message.reply_text("Мут должен быть минимум 30 секунд (например, 30s, 1m).")
+            update.message.reply_text("⚠️ Мут должен быть не менее 30 секунд (например, 30s, 1m).")
             return
 
         context.user_data['duration'] = duration_str
         context.user_data['duration_seconds'] = duration_seconds
-        update.message.reply_text("Введи причину мута:")
+        update.message.reply_text("Введите причину мута:")
         context.user_data['step'] = 'reason'
         return
 
+    # Обработка ввода причины мута
     if chat_type == "private" and context.user_data.get('step') == 'reason':
-        reason = update.message.text.strip()
+        reason = text.strip()
         user_to_mute_id = context.user_data['mut_user']
         duration_str = context.user_data['duration']
         duration_seconds = context.user_data['duration_seconds']
         target_chat_id = user_group_mapping.get(user_id)
 
         if not target_chat_id:
-            update.message.reply_text("Группа не найдена. Напиши /start в группе.")
+            update.message.reply_text("⚠️ Группа не найдена. Вызовите /start в группе.")
             context.user_data.clear()
             return
 
         try:
             chat_member = context.bot.get_chat_member(target_chat_id, user_to_mute_id)
             if chat_member.status in ['administrator', 'creator']:
-                update.message.reply_text("Нельзя замутить админа!")
+                update.message.reply_text("⚠️ Нельзя замутить администратора.")
                 context.user_data.clear()
                 return
 
@@ -270,17 +242,15 @@ def message_handler(update: Update, context: CallbackContext):
 
             context.user_data.clear()
         except Exception as e:
-            update.message.reply_text(f"Ошибка при муте: {e}")
+            update.message.reply_text(f"⚠️ Ошибка при муте: {e}")
             context.user_data.clear()
         return
 
+    # Обработка команды "калл"
     if text.startswith("калл"):
-        target_chat_id = chat_id
-        if chat_type == "private":
-            target_chat_id = user_group_mapping.get(user_id)
-
+        target_chat_id = get_target_chat_id(user_id, chat_id, chat_type)
         if not target_chat_id:
-            update.message.reply_text("Напиши /start в группе!")
+            update.message.reply_text("⚠️ Вызовите /start в группе.")
             return
 
         now = time.time()
@@ -289,12 +259,12 @@ def message_handler(update: Update, context: CallbackContext):
             remaining = int(CALL_TIMEOUT - (now - last_time))
             context.bot.send_message(
                 chat_id=target_chat_id,
-                text=f"Подожди {remaining} сек. до следующего вызова."
+                text=f"⏳ Подождите {remaining} секунд до следующего вызова."
             )
             return
 
         last_call_time[target_chat_id] = now
-        extra_text = update.message.text[4:].strip()
+        extra_text = text[4:].strip()
         message = f"📣 Вызов:\n{USER_LIST}"
         if extra_text:
             message += f"\nСообщение: {extra_text}"
@@ -304,99 +274,80 @@ def message_handler(update: Update, context: CallbackContext):
         )
 
 def mute_handler(update: Update, context: CallbackContext):
+    """Обработчик команды /mut."""
     user_id = update.effective_user.id
     chat_type = update.effective_chat.type
     chat_id = update.effective_chat.id
 
-    target_chat_id = chat_id
-    if chat_type == "private":
-        target_chat_id = user_group_mapping.get(user_id)
-
+    target_chat_id = get_target_chat_id(user_id, chat_id, chat_type)
     if not target_chat_id:
-        update.message.reply_text("Напиши /start в группе!")
+        update.message.reply_text("⚠️ Вызовите /start в группе.")
         return
 
-    if user_id not in ADMINS:
-        context.bot.send_message(
-            chat_id=target_chat_id,
-            text="Только админы могут мутить!"
-        )
+    if not check_admin_rights(user_id, context, target_chat_id):
         return
 
     potential_members = USER_LIST.splitlines()
     if not potential_members:
         context.bot.send_message(
             chat_id=target_chat_id,
-            text="Список участников пуст."
+            text="⚠️ Список участников пуст."
         )
         return
 
-    buttons = []
-    for member in potential_members:
-        member = member.strip()
-        if member:
-            buttons.append([InlineKeyboardButton(member, callback_data=f"mut_{member}")])
-
+    buttons = [[InlineKeyboardButton(member.strip(), callback_data=f"mut_{member.strip()}")] for member in potential_members if member.strip()]
     reply_markup = InlineKeyboardMarkup(buttons)
     context.bot.send_message(
         chat_id=target_chat_id,
-        text="Выбери кого замутить:",
+        text="Выберите пользователя для мута:",
         reply_markup=reply_markup
     )
 
 def unmute_handler(update: Update, context: CallbackContext):
+    """Обработчик команды /unmut."""
     user_id = update.effective_user.id
     chat_type = update.effective_chat.type
     chat_id = update.effective_chat.id
 
-    target_chat_id = chat_id
-    if chat_type == "private":
-        target_chat_id = user_group_mapping.get(user_id)
-
+    target_chat_id = get_target_chat_id(user_id, chat_id, chat_type)
     if not target_chat_id:
-        update.message.reply_text("Напиши /start в группе!")
+        update.message.reply_text("⚠️ Вызовите /start в группе.")
         return
 
-    if user_id not in ADMINS:
-        context.bot.send_message(
-            chat_id=target_chat_id,
-            text="Только админы могут размутить!"
-        )
+    if not check_admin_rights(user_id, context, target_chat_id):
         return
 
     if target_chat_id not in muted_users or not muted_users[target_chat_id]:
         context.bot.send_message(
             chat_id=target_chat_id,
-            text="Никто не замучен."
+            text="⚠️ Нет замученных пользователей."
         )
         return
 
-    buttons = []
-    for user_id, info in muted_users[target_chat_id].items():
-        buttons.append([InlineKeyboardButton(f"@{info['username']}", callback_data=f"unmut_{user_id}")])
-
+    buttons = [[InlineKeyboardButton(f"@{info['username']}", callback_data=f"unmut_{user_id}")] for user_id, info in muted_users[target_chat_id].items()]
     reply_markup = InlineKeyboardMarkup(buttons)
     context.bot.send_message(
         chat_id=target_chat_id,
-        text="Выбери кого размутить:",
+        text="Выберите пользователя для размута:",
         reply_markup=reply_markup
     )
 
 def button_handler(update: Update, context: CallbackContext):
+    """Обработчик нажатий на инлайн-кнопки."""
     query = update.callback_query
     query.answer()
 
     user_id = query.from_user.id
     target_chat_id = user_group_mapping.get(user_id)
     if not target_chat_id:
-        query.message.reply_text("Напиши /start в группе!")
+        query.message.reply_text("⚠️ Вызовите /start в группе.")
         return
 
     data = query.data
     action, identifier = data.split("_", 1)
 
     if action == "mut":
-        query.message.reply_text(f"Ты выбрал {identifier}. Введи ID пользователя (узнай через @userinfobot):")
+        query.message.reply_text(f"Вы выбрали {identifier}. Введите ID пользователя (узнать через @userinfobot):")
         context.user_data['mut_nickname'] = identifier
         context.user_data['step'] = 'mut_id'
         return
@@ -434,33 +385,31 @@ def button_handler(update: Update, context: CallbackContext):
         except Exception as e:
             context.bot.send_message(
                 chat_id=target_chat_id,
-                text=f"Ошибка: {e}"
+                text=f"⚠️ Ошибка при размуте: {e}"
             )
 
 def mutlist_handler(update: Update, context: CallbackContext):
+    """Обработчик команды /mutlist."""
     user_id = update.effective_user.id
     chat_type = update.effective_chat.type
     chat_id = update.effective_chat.id
 
-    target_chat_id = chat_id
-    if chat_type == "private":
-        target_chat_id = user_group_mapping.get(user_id)
-
+    target_chat_id = get_target_chat_id(user_id, chat_id, chat_type)
     if not target_chat_id:
-        update.message.reply_text("Напиши /start в группе!")
+        update.message.reply_text("⚠️ Вызовите /start в группе.")
         return
 
     if target_chat_id not in muted_users or not muted_users[target_chat_id]:
         context.bot.send_message(
             chat_id=target_chat_id,
-            text="Никто не замучен."
+            text="⚠️ Нет замученных пользователей."
         )
         return
 
-    message = "Список замученных:\n"
+    message = "📋 Список замученных пользователей:\n"
     for user_id, info in muted_users[target_chat_id].items():
         time_remaining = format_time_remaining(info['until_date'])
-        message += f"@{info['username']} — до {time_remaining}\nПричина: {info['reason']}\n"
+        message += f"👤 @{info['username']} — до {time_remaining}\nПричина: {info['reason']}\n"
 
     context.bot.send_message(
         chat_id=target_chat_id,
@@ -468,6 +417,7 @@ def mutlist_handler(update: Update, context: CallbackContext):
     )
 
 def main():
+    """Запуск бота."""
     updater = Updater(TOKEN, use_context=True)
     dp = updater.dispatcher
 
