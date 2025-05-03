@@ -135,19 +135,26 @@ def clear_chat_handler(update: Update, context: CallbackContext):
             update.message.reply_text("У меня нет прав на удаление сообщений! Сделай меня админом с правом 'Удалять сообщения'.")
             return
 
+        # Получаем ID закреплённого сообщения, если оно есть
+        pinned_message_id = context.bot.get_chat(target_chat_id).pinned_message.message_id if context.bot.get_chat(target_chat_id).pinned_message else None
+
         message_id = update.message.message_id
         deleted_count = 0
         update.message.reply_text("Начинаю очистку чата... Это может занять время.")
 
         while message_id > 1:  # Telegram message IDs начинаются с 1
             try:
+                # Пропускаем закреплённое сообщение
+                if pinned_message_id and message_id == pinned_message_id:
+                    message_id -= 1
+                    continue
                 context.bot.delete_message(chat_id=target_chat_id, message_id=message_id)
                 deleted_count += 1
                 message_id -= 1
                 # Показываем прогресс каждые 100 сообщений
                 if deleted_count % 100 == 0:
                     context.bot.send_message(chat_id=target_chat_id, text=f"Удалено {deleted_count} сообщений...")
-                time.sleep(0.02)  # Уменьшенная задержка для скорости, но с учётом лимитов
+                time.sleep(0.02)  # Уменьшенная задержка для скорости
             except Exception as e:
                 # Пропускаем сообщения, которые нельзя удалить (например, старше 48 часов)
                 message_id -= 1
@@ -155,7 +162,7 @@ def clear_chat_handler(update: Update, context: CallbackContext):
 
         context.bot.send_message(
             chat_id=target_chat_id,
-            text=f"Очистка завершена! Удалено {deleted_count} сообщений. Сообщения старше 48 часов не могут быть удалены из-за ограничений Telegram."
+            text=f"Очистка завершена! Удалено {deleted_count} сообщений, кроме закреплённого. Сообщения старше 48 часов не могут быть удалены из-за ограничений Telegram."
         )
     except Exception as e:
         update.message.reply_text(f"Ошибка при очистке: {e}")
