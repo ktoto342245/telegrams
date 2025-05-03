@@ -129,18 +129,34 @@ def clear_chat_handler(update: Update, context: CallbackContext):
             return
 
     try:
+        # Проверяем, есть ли у бота права администратора
+        bot_member = context.bot.get_chat_member(target_chat_id, context.bot.id)
+        if not bot_member.can_delete_messages:
+            update.message.reply_text("У меня нет прав на удаление сообщений! Сделай меня админом с правом 'Удалять сообщения'.")
+            return
+
         message_id = update.message.message_id
         deleted_count = 0
-        while message_id > 1:  # Telegram message IDs start at 1
+        update.message.reply_text("Начинаю очистку чата... Это может занять время.")
+
+        while message_id > 1:  # Telegram message IDs начинаются с 1
             try:
                 context.bot.delete_message(chat_id=target_chat_id, message_id=message_id)
                 deleted_count += 1
                 message_id -= 1
-                time.sleep(0.05)  # Avoid rate limits
-            except:
-                message_id -= 1  # Skip if message can't be deleted (e.g., too old)
+                # Показываем прогресс каждые 100 сообщений
+                if deleted_count % 100 == 0:
+                    context.bot.send_message(chat_id=target_chat_id, text=f"Удалено {deleted_count} сообщений...")
+                time.sleep(0.02)  # Уменьшенная задержка для скорости, но с учётом лимитов
+            except Exception as e:
+                # Пропускаем сообщения, которые нельзя удалить (например, старше 48 часов)
+                message_id -= 1
                 continue
-        update.message.reply_text(f"Чат полностью очищен! Удалено {deleted_count} сообщений.")
+
+        context.bot.send_message(
+            chat_id=target_chat_id,
+            text=f"Очистка завершена! Удалено {deleted_count} сообщений. Сообщения старше 48 часов не могут быть удалены из-за ограничений Telegram."
+        )
     except Exception as e:
         update.message.reply_text(f"Ошибка при очистке: {e}")
 
@@ -364,7 +380,7 @@ def button_handler(update: Update, context: CallbackContext):
     query.answer()
 
     user_id = query.from_user.id
-    target    target_chat_id = user_group_mapping.get(user_id)
+    target_chat_id = user_group_mapping.get(user_id)
     if not target_chat_id:
         query.message.reply_text("Напиши /start в группе!")
         return
